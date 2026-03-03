@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- ENUMS ----------
+
+enum Role {
+  TRAINER
+  CLIENT
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+}
+
+// ---------- MODELS ----------
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  password         String
+  name             String
+  role             Role
+  createdAt        DateTime @default(now())
+
+  // Trainer relationships
+  clients          User[]   @relation("TrainerClients")
+  trainerId        String?
+  trainer          User?    @relation("TrainerClients", fields: [trainerId], references: [id])
+
+  // Workout Plans
+  workoutPlans     WorkoutPlan[]  @relation("TrainerPlans")
+  assignedPlan     WorkoutPlan?   @relation("ClientPlan", fields: [assignedPlanId], references: [id])
+  assignedPlanId   String?
+
+  // Progress
+  progressLogs     ProgressLog[]
+
+  // Subscription (only relevant for trainers)
+  subscription     Subscription?
+}
+
+model Subscription {
+  id          String           @id @default(uuid())
+  plan        SubscriptionPlan
+  active      Boolean          @default(true)
+  trainer     User             @relation(fields: [trainerId], references: [id])
+  trainerId   String           @unique
+  createdAt   DateTime         @default(now())
+}
+
+// ---------- WORKOUT STRUCTURE ----------
+
+model WorkoutPlan {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime      @default(now())
+
+  trainer     User          @relation("TrainerPlans", fields: [trainerId], references: [id])
+  trainerId   String
+
+  workoutDays WorkoutDay[]
+
+  assignedClients User[]    @relation("ClientPlan")
+}
+
+model WorkoutDay {
+  id            String      @id @default(uuid())
+  name          String      // Ej: "Día 1 - Pecho"
+  order         Int
+  workoutPlan   WorkoutPlan @relation(fields: [workoutPlanId], references: [id])
+  workoutPlanId String
+
+  exercises     Exercise[]
+}
+
+model Exercise {
+  id            String      @id @default(uuid())
+  name          String
+  sets          Int
+  reps          String      // "8-10"
+  restSeconds   Int?
+
+  workoutDay    WorkoutDay  @relation(fields: [workoutDayId], references: [id])
+  workoutDayId  String
+}
+
+// ---------- CLIENT PROGRESS ----------
+
+model ProgressLog {
+  id          String   @id @default(uuid())
+  client      User     @relation(fields: [clientId], references: [id])
+  clientId    String
+
+  weight      Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+}
